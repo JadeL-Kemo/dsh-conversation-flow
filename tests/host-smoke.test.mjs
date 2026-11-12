@@ -60,6 +60,9 @@ function fakeCtx(record) {
       record.listeners.push({ event, handler, options })
       return () => {}
     },
+    get() {
+      return undefined
+    },
     inject(_deps, callback) {
       const scope = {
         connection: {
@@ -88,11 +91,12 @@ test('host plugin exports its identity', () => {
   assert.deepEqual(inject, ['commands'])
 })
 
-test('apply registers three commands, two routes and the two lifecycle listeners', async () => {
+test('apply registers three commands, three routes and the two lifecycle listeners', async () => {
   const record = { commands: [], routes: [], listeners: [], effects: [] }
   apply(fakeCtx(record))
   assert.deepEqual(record.commands.map(command => command.name).sort(), ['flow-drop', 'flow-regen', 'flow-rewind'])
   assert.deepEqual(record.routes.map(route => route.path).sort(), [
+    '/api/dsh-conversation-flow/delete-session',
     '/api/dsh-conversation-flow/execute',
     '/api/dsh-conversation-flow/status',
   ])
@@ -125,6 +129,21 @@ test('status route answers 404 when the session is not attached', async () => {
   const payload = await response.json()
   assert.equal(payload.ok, false)
   assert.equal(payload.error.code, 'session-not-open')
+})
+
+test('delete route answers 503 when session persistence is unavailable', async () => {
+  const record = { commands: [], routes: [], listeners: [], effects: [] }
+  apply(fakeCtx(record))
+  const route = record.routes.find(entry => entry.path === '/api/dsh-conversation-flow/delete-session')
+  const request = new Request('http://localhost/api/dsh-conversation-flow/delete-session', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ sessionId: 'session-1' }),
+  })
+  const response = await route.fetch(request)
+  assert.equal(response.status, 503)
+  const payload = await response.json()
+  assert.equal(payload.error.code, 'persistence-unavailable')
 })
 
 test('tools/execute listener forwards non-tracked tools untouched', async () => {
