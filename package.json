@@ -1,0 +1,65 @@
+{
+  "name": "dsh-conversation-flow",
+  "version": "0.1.0",
+  "description": "中文优先的对话倒带 / 重新生成 / 轮次删除插件（DeepSeek Harness）",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "rewind",
+    "regenerate"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JadeL-Kemo/dsh-conversation-flow.git"
+  },
+  "homepage": "https://github.com/JadeL-Kemo/dsh-conversation-flow",
+  "bugs": {
+    "url": "https://github.com/JadeL-Kemo/dsh-conversation-flow/issues"
+  },
+  "author": "JadeL-Kemo",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": ">=0.2.2-rc.1 <0.3.0-0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-api-session-controller"
+      ]
+    },
+    "compatibility": {
+      "dsh": "0.2.2-rc.1",
+      "dshReleases": {
+        "0.2.2-rc.1": "compatible"
+      },
+      "profiles": [
+        "desktop",
+        "web"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node --test tests/plan.test.mjs tests/store.test.mjs tests/host-smoke.test.mjs"
+  },
+  "license": "MIT"
+}
