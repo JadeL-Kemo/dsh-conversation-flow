@@ -12,6 +12,7 @@ import {
   isSurfaceEvent,
   listCandidates,
   messagePreview,
+  messageText,
   parseTarget,
   planRewind,
   surfaceUserTurns,
@@ -126,9 +127,16 @@ test('turnsOfSeqs maps shadowed seqs to turn numbers', () => {
 test('surfaceUserTurns maps rendered turns to their opening user seq', () => {
   const turns = surfaceUserTurns(makeEvents(), SURFACE)
   assert.deepEqual(turns, [
-    { turn: 2, userSeq: 6, turnStartSeq: 5, promptText: '第二轮问题' },
-    { turn: 1, userSeq: 2, turnStartSeq: 1, promptText: '第一轮问题' },
+    { turn: 2, userSeq: 6, turnStartSeq: 5, promptText: '第二轮问题', promptFull: '第二轮问题' },
+    { turn: 1, userSeq: 2, turnStartSeq: 1, promptText: '第一轮问题', promptFull: '第一轮问题' },
   ])
+})
+
+test('messageText keeps every character (newlines included) up to the limit', () => {
+  const message = { content: text('第一行\n第二行') }
+  assert.equal(messageText(message), '第一行\n第二行')
+  assert.equal(messageText(message, 3), '第一…')
+  assert.equal(messageText({ content: [] }), '')
 })
 
 test('formatCandidate renders index, time and preview', () => {

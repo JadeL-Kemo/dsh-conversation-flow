@@ -146,6 +146,21 @@ test('delete route answers 503 when session persistence is unavailable', async (
   assert.equal(payload.error.code, 'persistence-unavailable')
 })
 
+test('execute route rejects an edit without content', async () => {
+  const record = { commands: [], routes: [], listeners: [], effects: [] }
+  apply(fakeCtx(record))
+  const route = record.routes.find(entry => entry.path === '/api/dsh-conversation-flow/execute')
+  const request = new Request('http://localhost/api/dsh-conversation-flow/execute', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ sessionId: 'session-1', targetSeq: 2, mode: 'edit', content: '   ' }),
+  })
+  const response = await route.fetch(request)
+  assert.equal(response.status, 400)
+  const payload = await response.json()
+  assert.equal(payload.error.code, 'bad-request')
+})
+
 test('tools/execute listener forwards non-tracked tools untouched', async () => {
   const record = { commands: [], routes: [], listeners: [], effects: [] }
   apply(fakeCtx(record))
