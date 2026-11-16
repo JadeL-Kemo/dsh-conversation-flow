@@ -1,6 +1,6 @@
 # dsh-conversation-flow
 
-中文优先的 DSH 插件：**对话倒带 / 重新生成 / 编辑并重发 / 删除本轮 / 删除会话**，面向 DeepSeek Harness（DSH）0.2.2-rc.1。
+中文优先的 DSH 插件：**对话倒带 / 重新生成（保留历史版本）/ 编辑并重发 / 删除本轮 / 删除会话**，面向 DeepSeek Harness（DSH）0.2.2-rc.1。
 
 仓库：<https://github.com/JadeL-Kemo/dsh-conversation-flow>
 
@@ -12,6 +12,7 @@
 | --- | --- | --- | --- |
 | 倒带 ↶ | 回到某条提问之前（问题本身没问好 / 需求写错） | 截断到该提问之前 | 恢复到提问时的状态 |
 | 重新生成 ⟳ | 对 AI 产出不满意，重跑一遍 | 截断后用同样的提问重跑 | 不动 |
+| 历史版本 ◷ N | 多次重新生成后想对比、挑一个继续 | 弹窗列出被隐藏的旧回答；「以这一版继续」开新分支会话 | 不动 |
 | 编辑并重发 ✎ | 打错字 / 提问本身要改 | 弹窗改完提问后截断重发；可选删除后续、归档为分支或保留文件 | 按选项恢复或保留 |
 | 删除本轮 ✕ | 这一轮没有参考价值，不留记录 | 只截断 | 不动 |
 | 删除会话（⋯ 菜单） | 整个会话没有价值（测试会话 / 旧分支） | 会话移入回收站，列表消失 | 不动 |
@@ -22,6 +23,8 @@
 
 1. 重启 DSH 后：
    - 每条用户消息右侧出现 `↶ ⟳ ✎ ✕` 四个小按钮（悬停/常驻视主题而定）。
+   - 如果这一问被重新生成/编辑/倒带截断过，按钮旁会多一个 `◷ N`：点开是这一问的历史回答（旧版本只从上下文移除，日志仍保留）。
+   - 历史回答弹窗里每版都有全文、「复制」和「以这一版继续」；后者用 DSH 原生 fork 在该回答处开一个新分支会话，当前会话保持不变。
    - 会话行 `⋯` 菜单底部出现红色「删除会话」。
 2. 点击后均有确认弹窗：对话截断是表层 replace（日志 append-only，旧记录仍可审计），被隐藏的消息从界面消失。
 3. `✎` 会打开编辑弹窗，预填原始提问；改完点「重新发送」时三选一：
@@ -47,6 +50,7 @@ dsh plugin --profile desktop remove dsh-conversation-flow
 - **删除会话**：宿主 `sessionPersistence` 的 `config.root` + 后端目录布局（`<root>/<projectKey>/<encodeSegment(id)>/`）；先给 canonical payload 加 `.trash` 后缀（宿主列表扫描立即不可见），再把目录移入 `.sessions-trash/` 并写 `manifest.json`；活动会话仅在宿主提供 `cancel({kind:'disposed'}) + whenIdle()` 时先停后删，否则 409 session-busy；同时尽力清理 workspace 记账与投影缓存。
 - **客户端**：不使用已移除的快照 hooks，改为读取 `data-chat-turn` 行属性 + Host 轮次锚点接口；删除项走官方 `contextMenus` 注册表（`target: 'session'`），纯 DOM，无构建步骤。
 - **重新生成 / 编辑并重发**：都是先按倒带方式截断，再用 `agent.followup()` 把同一（或用户改过的）提问作为新回合发出去；旧产出留在 append-only 日志里可审计。
+- **历史版本**：`GET/POST /api/dsh-conversation-flow/versions` 把被 rewind 记录遮蔽的 `assistant/message` 找回来，并按所属轮次的首条人类提问归组；客户端只显示当前仍可见提问（`promptText` 相同）的历史回答。「以这一版继续」= `sessions.fork({sessionId, atSeq: answerSeq, increaseTitle:true})` → `uiWorkspace.openSession(childId)`。
 - 子代理会话（`delegationDepth > 0`）不参与检查点与倒带。
 
 ## 已知限制
@@ -54,6 +58,8 @@ dsh plugin --profile desktop remove dsh-conversation-flow
 - 倒带/重新生成/删除本轮只对已打开的会话生效（Host 通过 `agents.get(sessionId)` 找活动 agent）。
 - 删除会话只能删宿主启动时已知的会话（`persistence.list()` 为启动缓存；刚新建、尚未重启的会话可能 404）。
 - 删除当前打开的会话会先停止它，界面回到新会话；确认框有提示。
+- 历史版本只覆盖本插件截断过的旧回答（原生 DSH 操作不看）；同一提问文本出现多次时会归到同一组。
+- 「以这一版继续」会新建分支会话，工作区文件不回滚到旧版本状态。
 - 运行中的回合会先被取消；倒带操作不可撤销（只能再倒带回去，日志仍在）。
 - 文件恢复只覆盖本会话记录过的工作区文件；工作区之外、超过 8 MiB 或非本地后端的文件不恢复。
 - 附件是内容寻址共享存储，删除会话不会删除附件字节。

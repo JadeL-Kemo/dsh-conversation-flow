@@ -91,7 +91,7 @@ test('host plugin exports its identity', () => {
   assert.deepEqual(inject, ['commands'])
 })
 
-test('apply registers three commands, three routes and the two lifecycle listeners', async () => {
+test('apply registers three commands, four routes and the two lifecycle listeners', async () => {
   const record = { commands: [], routes: [], listeners: [], effects: [] }
   apply(fakeCtx(record))
   assert.deepEqual(record.commands.map(command => command.name).sort(), ['flow-drop', 'flow-regen', 'flow-rewind'])
@@ -99,6 +99,7 @@ test('apply registers three commands, three routes and the two lifecycle listene
     '/api/dsh-conversation-flow/delete-session',
     '/api/dsh-conversation-flow/execute',
     '/api/dsh-conversation-flow/status',
+    '/api/dsh-conversation-flow/versions',
   ])
   assert.deepEqual(record.listeners.map(listener => listener.event).sort(), ['agent/pre-step', 'tools/execute'])
   assert.equal(record.listeners.find(listener => listener.event === 'agent/pre-step').options.prepend, true)
@@ -128,6 +129,21 @@ test('status route answers 404 when the session is not attached', async () => {
   assert.equal(response.status, 404)
   const payload = await response.json()
   assert.equal(payload.ok, false)
+  assert.equal(payload.error.code, 'session-not-open')
+})
+
+test('versions route answers 404 when the session is not attached', async () => {
+  const record = { commands: [], routes: [], listeners: [], effects: [] }
+  apply(fakeCtx(record))
+  const route = record.routes.find(entry => entry.path === '/api/dsh-conversation-flow/versions')
+  const request = new Request('http://localhost/api/dsh-conversation-flow/versions', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ sessionId: 'session-missing' }),
+  })
+  const response = await route.fetch(request)
+  assert.equal(response.status, 404)
+  const payload = await response.json()
   assert.equal(payload.error.code, 'session-not-open')
 })
 

@@ -1,7 +1,7 @@
 {
   "name": "dsh-conversation-flow",
-  "version": "0.3.0",
-  "description": "中文优先的 DSH 插件：对话倒带 / 重新生成 / 编辑并重发 / 删除本轮 / 删除会话（含工作区文件恢复）",
+  "version": "0.4.0",
+  "description": "中文优先的 DSH 插件：对话倒带 / 重新生成（保留历史版本）/ 编辑并重发 / 删除本轮 / 删除会话（含工作区文件恢复）",
   "keywords": [
     "dsh",
     "deepseek-harness",
@@ -9,6 +9,7 @@
     "rewind",
     "regenerate",
     "edit",
+    "versions",
     "session-delete"
   ],
   "repository": {

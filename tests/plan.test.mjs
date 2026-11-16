@@ -7,6 +7,7 @@ import test from 'node:test'
 import {
   FlowError,
   buildTurnSegments,
+  collectVersions,
   formatCandidate,
   isHumanUserMessage,
   isSurfaceEvent,
@@ -143,4 +144,30 @@ test('formatCandidate renders index, time and preview', () => {
   const candidates = listCandidates(makeEvents(), SURFACE)
   const line = formatCandidate(candidates[0])
   assert.match(line, /^1\. \d{2}:\d{2} 第二轮问题$/)
+})
+
+test('collectVersions lists hidden assistant answers of a prompt', () => {
+  const events = makeEvents()
+  const markers = [{ shadowedSeqs: [2, 3, 6, 7, 8, 9] }]
+  const versions = collectVersions(events, markers)
+  assert.deepEqual(versions.map(version => version.answerSeq), [3, 7])
+  assert.deepEqual(versions.map(version => version.turn), [1, 2])
+  assert.deepEqual(versions.map(version => version.promptText), ['第一轮问题', '第二轮问题'])
+  assert.deepEqual(versions.map(version => version.text), ['回答一', '回答二'])
+  assert.equal(versions[0].time, 1_700_000_002_000)
+})
+
+test('collectVersions dedupes answers across markers and skips empty answers', () => {
+  const events = makeEvents()
+  events.push({ seq: 10, time: 1_700_000_009_000, type: 'assistant/message', surfaceOp: 'append', data: { turn: 2, step: 2, message: { id: 'a3', role: 'assistant', content: [] } } })
+  const markers = [{ shadowedSeqs: [3, 6, 7] }, { shadowedSeqs: [2, 3, 7, 10] }]
+  const versions = collectVersions(events, markers)
+  assert.deepEqual(versions.map(version => version.answerSeq), [3, 7])
+})
+
+test('collectVersions tolerates missing markers and bad entries', () => {
+  assert.deepEqual(collectVersions(makeEvents(), []), [])
+  assert.deepEqual(collectVersions(makeEvents(), undefined), [])
+  const versions = collectVersions(makeEvents(), [{ shadowedSeqs: [99, null, 'x'] }])
+  assert.deepEqual(versions, [])
 })
