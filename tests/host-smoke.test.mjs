@@ -232,6 +232,26 @@ test('versions route is read-only: lists hidden answers without appending to the
   }
 })
 
+test('status route exposes the answer message id of each turn for the native action slot', async () => {
+  const record = { commands: [], routes: [], listeners: [], effects: [] }
+  const sessionId = 'smoke-status-session'
+  const session = fakeSession(sessionId)
+  apply(fakeCtx(record, { agents: { get: id => (id === sessionId ? { session } : undefined) } }))
+  const route = record.routes.find(entry => entry.path === '/api/dsh-conversation-flow/status')
+  const request = new Request('http://localhost/api/dsh-conversation-flow/status', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ sessionId }),
+  })
+  const response = await route.fetch(request)
+  assert.equal(response.status, 200)
+  const payload = await response.json()
+  assert.equal(payload.ok, true)
+  assert.equal(payload.turns.length, 1)
+  assert.equal(payload.turns[0].turn, 1)
+  assert.equal(payload.turns[0].answerMessageId, 'a1')
+})
+
 test('pre-step listener creates a checkpoint for admitted human messages', async () => {
   const record = { commands: [], routes: [], listeners: [], effects: [] }
   const sessionId = 'smoke-pre-step-session'

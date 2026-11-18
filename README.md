@@ -23,7 +23,7 @@
 
 1. 重启 DSH 后：
    - 每条**用户消息**右侧：`↶`（倒带）、`✎`（编辑重发）；有历史版本时再加 `◷ N`。
-   - 每条 **AI 回答下方**：`⟳`（重新生成）、`✕`（删除本轮）；图标尺寸与原生复制/分支按钮一致（28×28 按钮、15px 图标）。
+   - 每条 **AI 回答下方**：`⟳`（重新生成）、`✕`（删除本轮）直接出现在回答底部的原生操作条里（复制与分叉图标之间），与原生按钮同尺寸（28×28 按钮、17px 图标）。
    - 如果这一问被重新生成/编辑/倒带截断过，`◷ N` 点开是这一问的历史回答（旧版本只从上下文移除，日志仍保留；弹窗只读，不会把旧回答加进当前对话）。
    - 历史回答弹窗里每版都有全文、「复制」和「新建分支并继续」；后者用 DSH 原生 fork 在该回答处开一个新分支会话——**切换版本只发生在新分支里**，原会话以及它后面的对话保持完整（不会出现「第 5 轮换成第 4 版导致 6-9 轮全部失效」的上下文爆炸）。
    - 会话行 `⋯` 菜单底部出现红色「删除会话」。
@@ -49,7 +49,7 @@ dsh plugin --profile desktop remove dsh-conversation-flow
 - **对话截断**：`Session.append('user/message', marker, {surfaceOp:{op:'replace',startSeq,endSeq}, sourceEventSeqs})`，与官方 /compact 同款表层机制；日志 append-only。
 - **文件恢复**：插件自有的检查点存储（默认 `%USERPROFILE%\.dsh\conversation-flow\<sessionId>\`）：每条用户消息生成一份密集清单，第一次 write/edit 前补录前值；恢复时按目标清单对照实时磁盘原子写/删。单文件上限 8 MiB，保留最近 100 份检查点。
 - **删除会话**：宿主 `sessionPersistence` 的 `config.root` + 后端目录布局（`<root>/<projectKey>/<encodeSegment(id)>/`）；先给 canonical payload 加 `.trash` 后缀（宿主列表扫描立即不可见），再把目录移入 `.sessions-trash/` 并写 `manifest.json`；活动会话仅在宿主提供 `cancel({kind:'disposed'}) + whenIdle()` 时先停后删，否则 409 session-busy；同时尽力清理 workspace 记账与投影缓存。
-- **客户端**：不使用已移除的快照 hooks，改为读取 `data-chat-turn` 行属性 + Host 轮次锚点接口；删除项走官方 `contextMenus` 注册表（`target: 'session'`），纯 DOM，无构建步骤。
+- **客户端**：提问侧（↶/✎/◷）用纯 DOM 读取 `data-chat-turn` 行属性 + Host 轮次锚点接口；回答侧（⟳/✕）注册官方 `conversation.chat.assistant-actions` 列表 slot，由 turn-tail 的原生操作条渲染在复制与分叉按钮之间；删除项走官方 `contextMenus` 注册表（`target: 'session'`）。无构建步骤。
 - **重新生成 / 编辑并重发**：都是先按倒带方式截断，再用 `agent.followup()` 把同一（或用户改过的）提问作为新回合发出去；旧产出留在 append-only 日志里可审计。
 - **历史版本**：`GET/POST /api/dsh-conversation-flow/versions` 把被 rewind 记录遮蔽的 `assistant/message` 找回来，并按所属轮次的首条人类提问归组；客户端只显示当前仍可见提问（`promptText` 相同）的历史回答。**该接口只读**（只读 `snapshotEvents()` 与 rewind 记录，不 append、不写会话），弹窗文本也不会进入上下文。切换版本 = `sessions.fork({sessionId, atSeq: answerSeq, increaseTitle:true})` → `uiWorkspace.openSession(childId)`：一律创建新分支，原会话（含该版本之后的对话）不变。
 - 子代理会话（`delegationDepth > 0`）不参与检查点与倒带。
