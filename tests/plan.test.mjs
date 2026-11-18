@@ -165,6 +165,24 @@ test('collectVersions dedupes answers across markers and skips empty answers', (
   assert.deepEqual(versions.map(version => version.answerSeq), [3, 7])
 })
 
+/** Freeze every nested object/array so an accidental in-place mutation throws. */
+function deepFreeze(value) {
+  if (value === null || typeof value !== 'object' || Object.isFrozen(value)) return value
+  Object.freeze(value)
+  for (const key of Object.keys(value)) deepFreeze(value[key])
+  return value
+}
+
+test('collectVersions is read-only: it never mutates events or rewind records', () => {
+  const events = deepFreeze(makeEvents())
+  const markers = deepFreeze([{ shadowedSeqs: [2, 3, 6, 7] }])
+  const versions = collectVersions(events, markers)
+  assert.deepEqual(versions.map(version => version.answerSeq), [3, 7])
+  // Frozen inputs prove no in-place mutation: any write would have thrown in ESM strict mode.
+  assert.deepEqual(markers[0].shadowedSeqs, [2, 3, 6, 7])
+  assert.equal(versions[0].promptText, '第一轮问题')
+})
+
 test('collectVersions tolerates missing markers and bad entries', () => {
   assert.deepEqual(collectVersions(makeEvents(), []), [])
   assert.deepEqual(collectVersions(makeEvents(), undefined), [])

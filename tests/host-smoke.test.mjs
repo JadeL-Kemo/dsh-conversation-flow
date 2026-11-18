@@ -36,7 +36,7 @@ function fakeSession(id) {
   }
 }
 
-function fakeCtx(record) {
+function fakeCtx(record, services = {}) {
   return {
     logger: { warn() {}, error() {}, info() {} },
     commands: {
@@ -60,8 +60,8 @@ function fakeCtx(record) {
       record.listeners.push({ event, handler, options })
       return () => {}
     },
-    get() {
-      return undefined
+    get(name) {
+      return services[name]
     },
     inject(_deps, callback) {
       const scope = {
@@ -73,8 +73,8 @@ function fakeCtx(record) {
             },
           },
         },
-        get() {
-          return undefined
+        get(name) {
+          return services[name]
         },
         effect(effect) {
           record.effects.push(effect)
@@ -191,6 +191,45 @@ test('tools/execute listener forwards non-tracked tools untouched', async () => 
   )
   assert.equal(nextCalled, true)
   assert.equal(result, 'result')
+})
+
+test('versions route is read-only: lists hidden answers without appending to the session', async () => {
+  const record = { commands: [], routes: [], listeners: [], effects: [] }
+  const sessionId = 'smoke-versions-session'
+  const session = fakeSession(sessionId)
+  const agent = { session }
+  apply(fakeCtx(record, { agents: { get: id => (id === sessionId ? agent : undefined) } }))
+  const route = record.routes.find(entry => entry.path === '/api/dsh-conversation-flow/versions')
+  const storeDir = join(homedir(), '.dsh', 'conversation-flow', sessionId)
+  try {
+    // A rewind record hiding the turn-1 answer (seq 3): versions must surface it.
+    await new CheckpointStore().appendRewind(sessionId, {
+      markerSeq: 99,
+      targetSeq: 2,
+      targetTurn: 1,
+      mode: 'regen',
+      time: 1_700_000_003_000,
+      shadowedSeqs: [2, 3],
+      shadowedTurns: [1],
+    })
+    const before = JSON.stringify(session.snapshotEvents())
+    const request = new Request('http://localhost/api/dsh-conversation-flow/versions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionId }),
+    })
+    const response = await route.fetch(request)
+    assert.equal(response.status, 200)
+    const payload = await response.json()
+    assert.equal(payload.ok, true)
+    assert.deepEqual(payload.versions.map(version => version.answerSeq), [3])
+    assert.equal(payload.versions[0].promptText, '第一轮问题')
+    // fakeSession.append() throws, so reaching here already proves nothing was written;
+    // the event snapshot must also be byte-identical.
+    assert.equal(JSON.stringify(session.snapshotEvents()), before)
+  } finally {
+    await fs.rm(storeDir, { recursive: true, force: true })
+  }
 })
 
 test('pre-step listener creates a checkpoint for admitted human messages', async () => {
